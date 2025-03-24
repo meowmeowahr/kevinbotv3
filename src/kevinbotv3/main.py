@@ -1,6 +1,6 @@
-from kevinbotlib.robot import BaseRobot
 from kevinbotlib.logger import Level
 from kevinbotlib.metrics import Metric
+from kevinbotlib.robot import BaseRobot
 
 from kevinbotv3 import __about__
 
