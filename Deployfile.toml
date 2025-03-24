@@ -1,0 +1,8 @@
+[target]
+name = "kevinbotv3"
+python_version = "3.13"
+glibc_version = "2.40"
+arch = "aarch64"
+user = "kevinbot"
+host = "robot.local"
+port = 22
