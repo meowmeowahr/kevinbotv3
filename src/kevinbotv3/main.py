@@ -36,3 +36,8 @@ class Kevinbot(BaseRobot):
         self.telemetry.info(f"Welcome to Kevinbot v3 (Code version {__about__.__version__})")
 
         self.core.begin()
+
+    def robot_end(self) -> None:
+        super().robot_end()
+
+        self.core.unlink()
