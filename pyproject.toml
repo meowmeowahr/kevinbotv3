@@ -25,8 +25,10 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "kevinbotlib>=1.0.0a7",
+    "kevinbotlib>=1.0.0a9",
     "kevinbotlib-deploytool>=0.0.1a2",
+    "pydantic>=2.10.6",
+    "tomli>=2.2.1",
 ]
 
 [project.urls]

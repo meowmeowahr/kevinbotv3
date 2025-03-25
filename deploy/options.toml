@@ -1,0 +1,5 @@
+[kevinbot.core]
+port="/dev/ttyUSB0"
+baud=921600
+timeout=2
+tick=1.0
