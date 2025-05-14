@@ -1,4 +1,6 @@
+from kevinbotlib.logger import Logger
 from kevinbotlib.scheduler import Command
+
 from kevinbotv3.core import KevinbotDrivebase
 
 
@@ -11,14 +13,14 @@ class DrivebaseHoldCommand(Command):
 
     def init(self) -> None:
         super().init()
-        print(self.hold)
+        Logger().debug(f"Set drivebase hold: {self.hold}")
         self.drivebase.set_hold(self.hold)
 
     def execute(self) -> None:
         return super().execute()
-    
+
     def end(self) -> None:
         return super().end()
-    
+
     def finished(self) -> bool:
         return True

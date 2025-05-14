@@ -92,13 +92,12 @@ class KevinbotCore:
         while True:
             if not self._status.linked:
                 return
-            
+
             data = self._controller.read()
-            
+
             if not data:
                 continue
             key, value = data
-            print(key)
             match key:
                 case b"core.enabled":
                     self._status.enabled = value == b"true"
