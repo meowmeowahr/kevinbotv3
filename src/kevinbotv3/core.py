@@ -1,7 +1,7 @@
 # Kevinbot Core Implementation for KevinbotLib
 import time
 import traceback
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from threading import Thread
 
 from kevinbotlib.hardware.controllers.keyvalue import RawKeyValueSerialController
@@ -40,20 +40,98 @@ class KevinbotDrivebase:
         self._states = [MotorDriveStatus.UNKNOWN, MotorDriveStatus.UNKNOWN]
 
     def drive_at_power(self, left: float, right: float):
-        self._core.controller.write(b"\x08\x01", f"{int(left*100)},{int(right*100)}".encode())
+        self._core.controller.write(b"\x07\x01", f"{int(left*100)},{int(right*100)}".encode())
 
     def drive_direction(self, power: float, direction: float):
-        self._core.controller.write(b"\x08\x02", f"{int(power*100)},{int(direction*100)}".encode())
+        self._core.controller.write(b"\x07\x02", f"{int(power*100)},{int(direction*100)}".encode())
 
-    def set_hold(self, hold: bool):
-        self._core.controller.write(b"\x08\x03", f"{int(hold)}".encode())
+    def set_hold(self, hold: bool):  # noqa: FBT001
+        self._core.controller.write(b"\x07\x03", f"{int(hold)}".encode())
+
+
+class LightingZone(IntEnum):
+    Base = 0
+    """Base lighting zone"""
+    Body = 1
+    """Body lighting zone"""
+    Head = 2
+    """Head lighting zone"""
+
+
+class LightingEffect(StrEnum):
+    color1 = "color1"
+    color2 = "color2"
+    flash = "flash"
+    fade = "fade"
+    jump3 = "jump3"
+    twinkle = "twinkle"
+    swipe = "swipe"
+    rainbow = "rainbow"
+    magic = "magic"
+    fire = "fire"
+
+
+class KevinbotLighting:
+    def __init__(self, core: "KevinbotCore") -> None:
+        self._core = core
+
+    def set_effect(self, zone: LightingZone, effect: LightingEffect):
+        if zone == LightingZone.Base:
+            self._core.controller.write(b"\x06\x20", f"{effect}".encode())
+        elif zone == LightingZone.Body:
+            self._core.controller.write(b"\x06\x10", f"{effect}".encode())
+        elif zone == LightingZone.Head:
+            self._core.controller.write(b"\x06\x00", f"{effect}".encode())
+
+    def set_color1(self, zone: LightingZone, color: tuple[int, int, int] | tuple[int, int, int, int]):
+        # convert to hex
+        if len(color) == 3:
+            color = (color[0], color[1], color[2], 0)
+        elif len(color) != 4:
+            raise ValueError("Color must be a tuple of 3 or 4 integers")
+        hex_color = f"{color[0]:02X}{color[1]:02X}{color[2]:02X}{color[3]:02X}"
+        print(hex_color)
+        if zone == LightingZone.Base:
+            self._core.controller.write(b"\x06\x21", hex_color.encode())
+        elif zone == LightingZone.Body:
+            self._core.controller.write(b"\x06\x11", hex_color.encode())
+        elif zone == LightingZone.Head:
+            self._core.controller.write(b"\x06\x01", hex_color.encode())
+
+    def set_color2(self, zone: LightingZone, color: tuple[int, int, int]):
+        # convert to hex
+        hex_color = f"{color[0]:02X}{color[1]:02X}{color[2]:02X}"
+        if zone == LightingZone.Base:
+            self._core.controller.write(b"\x06\x22", hex_color.encode())
+        elif zone == LightingZone.Body:
+            self._core.controller.write(b"\x06\x12", hex_color.encode())
+        elif zone == LightingZone.Head:
+            self._core.controller.write(b"\x06\x02", hex_color.encode())
+
+    def set_update(self, zone: LightingZone, update: int):
+        if zone == LightingZone.Base:
+            self._core.controller.write(b"\x06\x23", str(update).encode())
+        elif zone == LightingZone.Body:
+            self._core.controller.write(b"\x06\x13", str(update).encode())
+        elif zone == LightingZone.Head:
+            self._core.controller.write(b"\x06\x03", str(update).encode())
+
+    def set_brightness(self, zone: LightingZone, brightness: int):
+        if zone == LightingZone.Base:
+            self._core.controller.write(b"\x06\x24", str(brightness).encode())
+        elif zone == LightingZone.Body:
+            self._core.controller.write(b"\x06\x14", str(brightness).encode())
+        elif zone == LightingZone.Head:
+            self._core.controller.write(b"\x06\x04", str(brightness).encode())
+
 
 class KevinbotBms(BaseModel):
     voltages: list[float] = []
 
+
 class KevinbotCore:
     def __init__(self, interface: RawSerialInterface, heartbeat_interval: float = 1, battery_count: int = 2) -> None:
-        self._controller = RawKeyValueSerialController(interface, b"\xFA", b"\xFE")
+        self._controller = RawKeyValueSerialController(interface, b"\xfa", b"\xfe")
         BaseRobot.register_estop_hook(lambda: self.estop())
         self.heartbeat_interval = heartbeat_interval
 
@@ -125,7 +203,6 @@ class KevinbotCore:
                 Logger().error(f"Failed to parse data from core: {e!r}")
                 traceback.print_exc()
 
-
     @property
     def controller(self) -> RawKeyValueSerialController:
         return self._controller
@@ -141,3 +218,7 @@ class KevinbotCore:
     @property
     def bms(self) -> KevinbotBms:
         return self._bms
+
+    @property
+    def lighting(self) -> KevinbotLighting:
+        return KevinbotLighting(self)

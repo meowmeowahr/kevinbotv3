@@ -5,7 +5,7 @@ from kevinbotv3.core import KevinbotDrivebase
 
 
 class DrivebaseHoldCommand(Command):
-    def __init__(self, drivebase: KevinbotDrivebase, hold: bool) -> None:
+    def __init__(self, drivebase: KevinbotDrivebase, hold: bool) -> None:  # noqa: FBT001
         super().__init__()
 
         self.drivebase = drivebase

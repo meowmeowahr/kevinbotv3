@@ -13,7 +13,8 @@ from kevinbotlib.vision import (
 
 from kevinbotv3 import __about__
 from kevinbotv3.commands.drivebase_hold_command import DrivebaseHoldCommand
-from kevinbotv3.core import KevinbotCore
+from kevinbotv3.commands.lighting_commands import FireCommand, RainbowCommand, WhiteCommand
+from kevinbotv3.core import KevinbotCore, LightingZone
 from kevinbotv3.settings.schema import SettingsSchema
 from kevinbotv3.util import apply_deadband
 
@@ -41,8 +42,12 @@ class Kevinbot(BaseRobot):
             ),
             self.settings.kevinbot.core.tick,
         )
-        self.metrics.add("kevinbot.core.linked", Metric("Core Linked", self.core.state.linked, kind=MetricType.BooleanType))
-        self.metrics.add("kevinbot.core.enabled", Metric("Core Enabled", self.core.state.enabled, kind=MetricType.BooleanType))
+        self.metrics.add(
+            "kevinbot.core.linked", Metric("Core Linked", self.core.state.linked, kind=MetricType.BooleanType)
+        )
+        self.metrics.add(
+            "kevinbot.core.enabled", Metric("Core Enabled", self.core.state.enabled, kind=MetricType.BooleanType)
+        )
         for batt in range(self.core.battery_count):
             self.metrics.add(f"kevinbot.battery.{batt}.voltage", Metric(f"Battery {batt} Voltage", 0.0))
 
@@ -51,7 +56,7 @@ class Kevinbot(BaseRobot):
         self.joystick.start_polling()
 
         self.camera = CameraByIndex(0)
-        self.camera.set_resolution(1920, 1080)
+        self.camera.set_resolution(640, 480)
         self.pipeline = EmptyPipeline(self.camera.get_frame)
 
     def robot_start(self) -> None:
@@ -59,8 +64,28 @@ class Kevinbot(BaseRobot):
 
         self.telemetry.info(f"Welcome to Kevinbot v3 (Code version {__about__.__version__})")
 
-        Trigger(lambda: XboxControllerButtons.LeftBumper in self.joystick.get_buttons(), self.scheduler).on_true(DrivebaseHoldCommand(self.core.drivebase, False))
-        Trigger(lambda: XboxControllerButtons.RightBumper in self.joystick.get_buttons(), self.scheduler).on_true(DrivebaseHoldCommand(self.core.drivebase, True))
+        Trigger(lambda: XboxControllerButtons.LeftBumper in self.joystick.get_buttons(), self.scheduler).on_true(
+            DrivebaseHoldCommand(self.core.drivebase, False)
+        )
+        Trigger(lambda: XboxControllerButtons.RightBumper in self.joystick.get_buttons(), self.scheduler).on_true(
+            DrivebaseHoldCommand(self.core.drivebase, True)
+        )
+
+        Trigger(lambda: XboxControllerButtons.A in self.joystick.get_buttons(), self.scheduler).on_true(
+            WhiteCommand(self.core.lighting, LightingZone.Base, 255)
+        )
+
+        Trigger(lambda: XboxControllerButtons.B in self.joystick.get_buttons(), self.scheduler).on_true(
+            FireCommand(self.core.lighting, LightingZone.Base, 255)
+        )
+
+        Trigger(lambda: XboxControllerButtons.X in self.joystick.get_buttons(), self.scheduler).on_true(
+            RainbowCommand(self.core.lighting, LightingZone.Base, 255)
+        )
+
+        Trigger(lambda: XboxControllerButtons.Y in self.joystick.get_buttons(), self.scheduler).on_true(
+            WhiteCommand(self.core.lighting, LightingZone.Base, 0)
+        )
 
         self.core.begin()
 
@@ -81,11 +106,11 @@ class Kevinbot(BaseRobot):
 
         # ok, frame = self.pipeline.run()
         # if ok:
-        #     encoded = FrameEncoders.encode_jpg(frame, 100)
-        #     self.comm_client.send(
-        #         "streams/camera0",
-        #         MjpegStreamSendable(value=encoded, quality=100, resolution=frame.shape[:2]),
-        #     )
+        # encoded = FrameEncoders.encode_jpg(frame, 75)
+        # self.comm_client.send(
+        #     "streams/camera0",
+        #     MjpegStreamSendable(value=encoded, quality=75, resolution=frame.shape[:2]),
+        # )
 
         self.scheduler.iterate()
 
