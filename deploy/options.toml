@@ -3,3 +3,7 @@ port="/dev/ttyUSB0"
 baud=921600
 timeout=2
 tick=1.0
+
+[kevinbot.controller]
+power_deadband=0.06
+steer_deadband=0.01

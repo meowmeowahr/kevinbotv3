@@ -1,7 +1,10 @@
 # Kevinbot Core Implementation for KevinbotLib
+import re
 import time
 from enum import IntEnum
 from threading import Thread
+import trace
+import traceback
 
 from kevinbotlib.hardware.controllers.keyvalue import RawKeyValueSerialController
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
@@ -47,6 +50,8 @@ class KevinbotDrivebase:
     def set_hold(self, hold: bool):
         self._core.controller.write(b"\x08\x03", f"{int(hold)}".encode())
 
+class KevinbotBms(BaseModel):
+    voltages: list[float] = []
 
 class KevinbotCore:
     def __init__(self, interface: RawSerialInterface, heartbeat_interval: float = 1, battery_count: int = 2) -> None:
@@ -56,6 +61,8 @@ class KevinbotCore:
 
         self.battery_count = battery_count
         self._status = CoreStatus()
+        self._bms = KevinbotBms()
+        self._bms.voltages = [0.0] * self.battery_count
 
     def begin(self) -> None:
         """Begin a new connection to the Kevinbot Core (formerly Kevinbot Hardware Core)"""
@@ -90,30 +97,35 @@ class KevinbotCore:
 
     def _rx_loop(self):
         while True:
-            if not self._status.linked:
-                return
+            try:
+                if not self._status.linked:
+                    return
 
-            data = self._controller.read()
+                data = self._controller.read()
 
-            if not data:
-                continue
-            key, value = data
-            match key:
-                case b"core.enabled":
-                    self._status.enabled = value == b"true"
-                case b"connection.requesthandshake":
-                    Logger().warning("Received handshake request from core")
-                    self._controller.write(b"\x02\x04")
-                    self._controller.write(b"\x02\x02")
-                    self._controller.write(b"\x04\x01", b"0")
-                    self._controller.write(b"\x03\x05")
-                case b"bms.voltages":
-                    voltages = [float(v.decode()) / 100 for v in value.split(b",")]
-                    if len(voltages) != self.battery_count:
-                        Logger().error(f"Received {len(voltages)} voltages, expected {self.battery_count}")
-                    else:
-                        for i in range(self.battery_count):
-                            Logger().info(f"Battery {i} voltage: {voltages[i]}V")
+                if not data:
+                    continue
+                key, value = data
+                match key:
+                    case b"core.enabled":
+                        self._status.enabled = value == b"true"
+                    case b"connection.requesthandshake":
+                        Logger().warning("Received handshake request from core")
+                        self._controller.write(b"\x02\x04")
+                        self._controller.write(b"\x02\x02")
+                        self._controller.write(b"\x04\x01", b"0")
+                        self._controller.write(b"\x03\x05")
+                    case b"bms.voltages":
+                        voltages = [float(v.decode()) / 100 for v in value.split(b",")]
+                        if len(voltages) != self.battery_count:
+                            Logger().error(f"Received {len(voltages)} voltages, expected {self.battery_count}")
+                        else:
+                            for i in range(self.battery_count):
+                                Logger().info(f"Battery {i} voltage: {voltages[i]}V")
+                            self._bms.voltages = voltages
+            except ValueError as e:
+                Logger().error(f"Failed to parse data from core: {repr(e)}")
+                traceback.print_exc()
 
 
     @property
@@ -127,3 +139,7 @@ class KevinbotCore:
     @property
     def drivebase(self) -> KevinbotDrivebase:
         return KevinbotDrivebase(self)
+    
+    @property
+    def bms(self) -> KevinbotBms:
+        return self._bms

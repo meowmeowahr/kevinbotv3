@@ -2,7 +2,7 @@ import tomli
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import LocalXboxController, XboxControllerButtons
 from kevinbotlib.logger import Level
-from kevinbotlib.metrics import Metric
+from kevinbotlib.metrics import Metric, MetricType
 from kevinbotlib.robot import BaseRobot
 from kevinbotlib.scheduler import CommandScheduler, Trigger
 from kevinbotlib.vision import (
@@ -41,6 +41,10 @@ class Kevinbot(BaseRobot):
             ),
             self.settings.kevinbot.core.tick,
         )
+        self.metrics.add("kevinbot.core.linked", Metric("Core Linked", self.core.state.linked, kind=MetricType.BooleanType))
+        self.metrics.add("kevinbot.core.enabled", Metric("Core Enabled", self.core.state.enabled, kind=MetricType.BooleanType))
+        for batt in range(self.core.battery_count):
+            self.metrics.add(f"kevinbot.battery.{batt}.voltage", Metric(f"Battery {batt} Voltage", 0.0))
 
         # self.joystick = RemoteXboxController(self.comm_client, "%ControlConsole/joystick/0")
         self.joystick = LocalXboxController(0)
@@ -63,11 +67,16 @@ class Kevinbot(BaseRobot):
     def robot_periodic(self, opmode: str, enabled: bool):  # noqa: FBT001
         super().robot_periodic(opmode, enabled)
 
+        self.metrics.update("kevinbot.core.linked", self.core.state.linked)
+        self.metrics.update("kevinbot.core.enabled", self.core.state.enabled)
+        for batt in range(self.core.battery_count):
+            self.metrics.update(f"kevinbot.battery.{batt}.voltage", self.core.bms.voltages[batt])
+
         self.core.request_state_update(enabled)
 
         self.core.drivebase.drive_direction(
-            -apply_deadband(self.joystick.get_left_stick()[1], 0.08),
-            -apply_deadband(self.joystick.get_left_stick()[0], 0.08),
+            -apply_deadband(self.joystick.get_left_stick()[1], self.settings.kevinbot.controller.power_deadband),
+            -apply_deadband(self.joystick.get_left_stick()[0], self.settings.kevinbot.controller.steer_deadband),
         )
 
         # ok, frame = self.pipeline.run()
