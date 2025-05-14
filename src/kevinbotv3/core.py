@@ -1,10 +1,8 @@
 # Kevinbot Core Implementation for KevinbotLib
-import re
 import time
+import traceback
 from enum import IntEnum
 from threading import Thread
-import trace
-import traceback
 
 from kevinbotlib.hardware.controllers.keyvalue import RawKeyValueSerialController
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
@@ -124,7 +122,7 @@ class KevinbotCore:
                                 Logger().info(f"Battery {i} voltage: {voltages[i]}V")
                             self._bms.voltages = voltages
             except ValueError as e:
-                Logger().error(f"Failed to parse data from core: {repr(e)}")
+                Logger().error(f"Failed to parse data from core: {e!r}")
                 traceback.print_exc()
 
 
@@ -139,7 +137,7 @@ class KevinbotCore:
     @property
     def drivebase(self) -> KevinbotDrivebase:
         return KevinbotDrivebase(self)
-    
+
     @property
     def bms(self) -> KevinbotBms:
         return self._bms
