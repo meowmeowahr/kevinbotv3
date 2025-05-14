@@ -16,16 +16,16 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "kevinbotlib>=1.0.0a9",
+    "kevinbotlib>=1.0.0a11",
     "kevinbotlib-deploytool>=0.0.1a2",
     "pydantic>=2.10.6",
     "tomli>=2.2.1",

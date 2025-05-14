@@ -222,7 +222,7 @@ wheels = [
 
 [[package]]
 name = "kevinbotlib"
-version = "1.0.0a9"
+version = "1.0.0a11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ansi2html" },
@@ -245,9 +245,9 @@ dependencies = [
     { name = "qtpy" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/08/b2/17c3994de143842ad028129ae9863cb213e7c2e0559133465243c2052cbd/kevinbotlib-1.0.0a9.tar.gz", hash = "sha256:b114721713a54311089e33ce4688df24823c06e870a5123305f6b7f91df53d00", size = 400504 }
+sdist = { url = "https://files.pythonhosted.org/packages/60/58/e0c03d5302d3a1cd8bbe47b83958474d5898106ab54f7b12af67bde8dcc2/kevinbotlib-1.0.0a11.tar.gz", hash = "sha256:adf6465659c210fcad0ab7394d9f9d29a1d040bbff934b8b543f1cbc7d33e54e", size = 400796 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/74/556d3eab609d5275dd65b017122ac6220abcefa4313277752e017de96c0c/kevinbotlib-1.0.0a9-py3-none-any.whl", hash = "sha256:0bdecbbbce22ee53ec1f7b2d9c82911b65f7a38c703041e9e6e983b3667656f9", size = 157275 },
+    { url = "https://files.pythonhosted.org/packages/73/3b/93667ab4bbc343e9f06fafde4d53796e32cec1bffa023f8fa4d702908d18/kevinbotlib-1.0.0a11-py3-none-any.whl", hash = "sha256:fc739b8e01ea14e9145dc4e256411ced76a5ef8e041e8362bcc7c47d4d372de8", size = 157424 },
 ]
 
 [[package]]
@@ -280,7 +280,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "kevinbotlib", specifier = ">=1.0.0a9" },
+    { name = "kevinbotlib", specifier = ">=1.0.0a11" },
     { name = "kevinbotlib-deploytool", specifier = ">=0.0.1a2" },
     { name = "pydantic", specifier = ">=2.10.6" },
     { name = "tomli", specifier = ">=2.2.1" },
