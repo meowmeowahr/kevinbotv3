@@ -1,6 +1,10 @@
+from functools import partial
+import math
+
 import tomli
+
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
-from kevinbotlib.joystick import LocalXboxController, XboxControllerButtons
+from kevinbotlib.joystick import RemoteXboxController, XboxControllerButtons
 from kevinbotlib.logger import Level
 from kevinbotlib.metrics import Metric, MetricType
 from kevinbotlib.robot import BaseRobot
@@ -9,6 +13,8 @@ from kevinbotlib.vision import (
     CameraByIndex,
     EmptyPipeline,
     VisionCommUtils,
+    FrameEncoders,
+    MjpegStreamSendable,
 )
 
 from kevinbotv3 import __about__
@@ -21,7 +27,7 @@ from kevinbotv3.util import apply_deadband
 
 class Kevinbot(BaseRobot):
     def __init__(self):
-        super().__init__(["Teleoperated"], log_level=Level.DEBUG)
+        super().__init__(["Teleoperated", "Sine"], log_level=Level.DEBUG)
 
         # Read toml settings
         with open("deploy/options.toml", "rb") as f:
@@ -42,6 +48,7 @@ class Kevinbot(BaseRobot):
             ),
             self.settings.kevinbot.core.tick,
         )
+        BaseRobot.register_estop_hook(self.core.estop)
         self.metrics.add(
             "kevinbot.core.linked", Metric("Core Linked", self.core.state.linked, kind=MetricType.BooleanType)
         )
@@ -50,14 +57,17 @@ class Kevinbot(BaseRobot):
         )
         for batt in range(self.core.battery_count):
             self.metrics.add(f"kevinbot.battery.{batt}.voltage", Metric(f"Battery {batt} Voltage", 0.0))
+            BaseRobot.add_battery(self, 5, 25, partial(lambda batt: self.core.bms.voltages[batt] if len(self.core.bms.voltages) > batt - 1 else 0.0, batt))
 
-        # self.joystick = RemoteXboxController(self.comm_client, "%ControlConsole/joystick/0")
-        self.joystick = LocalXboxController(0)
+        self.joystick = RemoteXboxController(self.comm_client, "%ControlConsole/joystick/0")
+        # self.joystick = LocalXboxController(0)
         self.joystick.start_polling()
 
         self.camera = CameraByIndex(0)
-        self.camera.set_resolution(640, 480)
+        self.camera.set_resolution(1280, 720)
         self.pipeline = EmptyPipeline(self.camera.get_frame)
+
+        self.sine_period = 0
 
     def robot_start(self) -> None:
         super().robot_start()
@@ -99,20 +109,28 @@ class Kevinbot(BaseRobot):
 
         self.core.request_state_update(enabled)
 
-        self.core.drivebase.drive_direction(
-            -apply_deadband(self.joystick.get_left_stick()[1], self.settings.kevinbot.controller.power_deadband),
-            -apply_deadband(self.joystick.get_left_stick()[0], self.settings.kevinbot.controller.steer_deadband),
-        )
+        if opmode == "Teleoperated":
+            self.core.drivebase.drive_direction(
+                -apply_deadband(self.joystick.get_left_stick()[1], self.settings.kevinbot.controller.power_deadband),
+                -apply_deadband(self.joystick.get_left_stick()[0], self.settings.kevinbot.controller.steer_deadband),
+            )
 
-        # ok, frame = self.pipeline.run()
-        # if ok:
-        # encoded = FrameEncoders.encode_jpg(frame, 75)
-        # self.comm_client.send(
-        #     "streams/camera0",
-        #     MjpegStreamSendable(value=encoded, quality=75, resolution=frame.shape[:2]),
-        # )
+            ok, frame = self.pipeline.run()
+            if ok:
+                encoded = FrameEncoders.encode_jpg(frame, 75)
+                self.comm_client.set(
+                    "streams/camera0",
+                    MjpegStreamSendable(value=encoded, quality=50, resolution=frame.shape[:2]),
+                )
+        elif opmode == "Sine":
+            self.sine_period += 0.001
+            self.core.drivebase.drive_at_power(
+                math.sin(self.sine_period),
+                math.sin(self.sine_period),
+            )
 
         self.scheduler.iterate()
+
 
     def robot_end(self) -> None:
         super().robot_end()
