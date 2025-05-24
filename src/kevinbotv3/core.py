@@ -6,7 +6,7 @@ from threading import Thread
 
 from kevinbotlib.hardware.controllers.keyvalue import RawKeyValueSerialController
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
-from kevinbotlib.logger import Logger
+from kevinbotlib.logger import Logger, LoggerWriteOpts, Level
 from kevinbotlib.robot import BaseRobot
 from pydantic import BaseModel
 
@@ -47,6 +47,22 @@ class KevinbotDrivebase:
 
     def set_hold(self, hold: bool):  # noqa: FBT001
         self._core.controller.write(b"\x07\x03", f"{int(hold)}".encode())
+
+    @property
+    def amps(self):
+        return self._amps
+
+    @property
+    def watts(self):
+        return self._watts
+
+    @property
+    def states(self):
+        return self._states
+
+    @property
+    def powers(self):
+        return self._powers
 
 
 class LightingZone(IntEnum):
@@ -90,7 +106,6 @@ class KevinbotLighting:
         elif len(color) != 4:
             raise ValueError("Color must be a tuple of 3 or 4 integers")
         hex_color = f"{color[0]:02X}{color[1]:02X}{color[2]:02X}{color[3]:02X}"
-        print(hex_color)
         if zone == LightingZone.Base:
             self._core.controller.write(b"\x06\x21", hex_color.encode())
         elif zone == LightingZone.Body:
@@ -138,6 +153,7 @@ class KevinbotCore:
         self.battery_count = battery_count
         self._status = CoreStatus()
         self._bms = KevinbotBms()
+        self._drivebase = KevinbotDrivebase(self)
         self._bms.voltages = [0.0] * self.battery_count
 
     def begin(self) -> None:
@@ -196,12 +212,33 @@ class KevinbotCore:
                         if len(voltages) != self.battery_count:
                             Logger().error(f"Received {len(voltages)} voltages, expected {self.battery_count}")
                         else:
-                            for i in range(self.battery_count):
-                                Logger().info(f"Battery {i} voltage: {voltages[i]}V")
                             self._bms.voltages = voltages
-            except ValueError as e:
-                Logger().error(f"Failed to parse data from core: {e!r}")
-                traceback.print_exc()
+                    case b"motors.watts":
+                        watts = [float(w.decode()) / 1000 for w in value.split(b",")]
+                        if len(watts) != 2:
+                            Logger().error(f"Received {len(watts)} watts, expected 2")
+                        else:
+                            self.drivebase._watts = watts
+                    case b"motors.amps":
+                        amps = [float(a.decode()) / 1000 for a in value.split(b",")]
+                        if len(amps) != 2:
+                            Logger().error(f"Received {len(amps)} amps, expected 2")
+                        else:
+                            self.drivebase._amps = amps
+                    case b"motors.status":
+                        statuses = [MotorDriveStatus(int(s.decode())) for s in value.split(b",")]
+                        if len(statuses) != 2:
+                            Logger().error(f"Received {len(statuses)} statuses, expected 2")
+                        else:
+                            self.drivebase._states = statuses
+                    case b"motors.powers":
+                        powers = [float(p.decode()) / 100 for p in value.split(b",")]
+                        if len(powers) != 2:
+                            Logger().error(f"Received {len(powers)} powers, expected 2")
+                        else:
+                            self.drivebase._powers = powers
+            except (ValueError, UnicodeDecodeError) as e:
+                Logger().log(Level.ERROR, f"Failed to parse data from core: {e!r}", LoggerWriteOpts(exception=e))
 
     @property
     def controller(self) -> RawKeyValueSerialController:
@@ -213,7 +250,7 @@ class KevinbotCore:
 
     @property
     def drivebase(self) -> KevinbotDrivebase:
-        return KevinbotDrivebase(self)
+        return self._drivebase
 
     @property
     def bms(self) -> KevinbotBms:

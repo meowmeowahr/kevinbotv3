@@ -2,9 +2,14 @@ from functools import partial
 import math
 
 import tomli
+from kevinbotlib.comm import StringSendable, FloatSendable
 
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
-from kevinbotlib.joystick import RemoteXboxController, XboxControllerButtons
+from kevinbotlib.joystick import (
+    RemoteXboxController,
+    XboxControllerButtons,
+    LocalXboxController,
+)
 from kevinbotlib.logger import Level
 from kevinbotlib.metrics import Metric, MetricType
 from kevinbotlib.robot import BaseRobot
@@ -19,8 +24,14 @@ from kevinbotlib.vision import (
 
 from kevinbotv3 import __about__
 from kevinbotv3.commands.drivebase_hold_command import DrivebaseHoldCommand
-from kevinbotv3.commands.lighting_commands import FireCommand, RainbowCommand, WhiteCommand
+from kevinbotv3.commands.lighting_commands import (
+    FireCommand,
+    RainbowCommand,
+    WhiteCommand,
+    OffCommand,
+)
 from kevinbotv3.core import KevinbotCore, LightingZone
+from kevinbotv3.runtime import Runtime
 from kevinbotv3.settings.schema import SettingsSchema
 from kevinbotv3.util import apply_deadband
 
@@ -57,7 +68,7 @@ class Kevinbot(BaseRobot):
         )
         for batt in range(self.core.battery_count):
             self.metrics.add(f"kevinbot.battery.{batt}.voltage", Metric(f"Battery {batt} Voltage", 0.0))
-            BaseRobot.add_battery(self, 5, 25, partial(lambda batt: self.core.bms.voltages[batt] if len(self.core.bms.voltages) > batt - 1 else 0.0, batt))
+            BaseRobot.add_battery(self, 10, 21, partial(lambda batt: self.core.bms.voltages[batt] if len(self.core.bms.voltages) > batt - 1 else 0.0, batt))
 
         self.joystick = RemoteXboxController(self.comm_client, "%ControlConsole/joystick/0")
         # self.joystick = LocalXboxController(0)
@@ -94,7 +105,7 @@ class Kevinbot(BaseRobot):
         )
 
         Trigger(lambda: XboxControllerButtons.Y in self.joystick.get_buttons(), self.scheduler).on_true(
-            WhiteCommand(self.core.lighting, LightingZone.Base, 0)
+            OffCommand(self.core.lighting, LightingZone.Base)
         )
 
         self.core.begin()
@@ -114,6 +125,10 @@ class Kevinbot(BaseRobot):
                 -apply_deadband(self.joystick.get_left_stick()[1], self.settings.kevinbot.controller.power_deadband),
                 -apply_deadband(self.joystick.get_left_stick()[0], self.settings.kevinbot.controller.steer_deadband),
             )
+            # self.core.drivebase.drive_direction(
+            #     -apply_deadband(self.joystick.get_triggers()[0]-self.joystick.get_triggers()[1], self.settings.kevinbot.controller.power_deadband),
+            #     -apply_deadband(self.joystick.get_left_stick()[0], self.settings.kevinbot.controller.steer_deadband),
+            # )
 
             ok, frame = self.pipeline.run()
             if ok:
@@ -128,6 +143,24 @@ class Kevinbot(BaseRobot):
                 math.sin(self.sine_period),
                 math.sin(self.sine_period),
             )
+
+        self.comm_client.set("dashboard/DriveStateLeft", StringSendable(value=self.core.drivebase.states[0].name))
+        self.comm_client.set("dashboard/DriveStateRight", StringSendable(value=self.core.drivebase.states[1].name))
+
+        self.comm_client.set("dashboard/DriveSpeedLeft", FloatSendable(value=self.core.drivebase.powers[0]))
+        self.comm_client.set("dashboard/DriveSpeedRight", FloatSendable(value=self.core.drivebase.powers[1]))
+
+        self.comm_client.set("dashboard/Battery", FloatSendable(value=self.core.bms.voltages[0]))
+
+        match Runtime.Leds.effect:
+            case "white":
+                self.comm_client.set("dashboard/LedState", StringSendable(value="#ffffff"))
+            case "off":
+                self.comm_client.set("dashboard/LedState", StringSendable(value="#000000"))
+            case "fire":
+                self.comm_client.set("dashboard/LedState", StringSendable(value="#ef8f11"))
+            case "rainbow":
+                self.comm_client.set("dashboard/LedState", StringSendable(value="#118fef"))
 
         self.scheduler.iterate()
 

@@ -6,4 +6,4 @@ tick=1.0
 
 [kevinbot.controller]
 power_deadband=0.06
-steer_deadband=0.01
+steer_deadband=0.00
