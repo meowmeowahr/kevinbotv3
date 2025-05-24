@@ -1,12 +1,11 @@
 # Kevinbot Core Implementation for KevinbotLib
 import time
-import traceback
 from enum import IntEnum, StrEnum
 from threading import Thread
 
 from kevinbotlib.hardware.controllers.keyvalue import RawKeyValueSerialController
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
-from kevinbotlib.logger import Logger, LoggerWriteOpts, Level
+from kevinbotlib.logger import Level, Logger, LoggerWriteOpts
 from kevinbotlib.robot import BaseRobot
 from pydantic import BaseModel
 
@@ -101,10 +100,11 @@ class KevinbotLighting:
 
     def set_color1(self, zone: LightingZone, color: tuple[int, int, int] | tuple[int, int, int, int]):
         # convert to hex
-        if len(color) == 3:
+        if len(color) == 3:  # noqa: PLR2004
             color = (color[0], color[1], color[2], 0)
-        elif len(color) != 4:
-            raise ValueError("Color must be a tuple of 3 or 4 integers")
+        elif len(color) != 4:  # noqa: PLR2004
+            msg = "Color must be a tuple of 3 or 4 integers"
+            raise ValueError(msg)
         hex_color = f"{color[0]:02X}{color[1]:02X}{color[2]:02X}{color[3]:02X}"
         if zone == LightingZone.Base:
             self._core.controller.write(b"\x06\x21", hex_color.encode())
@@ -215,28 +215,28 @@ class KevinbotCore:
                             self._bms.voltages = voltages
                     case b"motors.watts":
                         watts = [float(w.decode()) / 1000 for w in value.split(b",")]
-                        if len(watts) != 2:
+                        if len(watts) != 2:  # noqa: PLR2004
                             Logger().error(f"Received {len(watts)} watts, expected 2")
                         else:
-                            self.drivebase._watts = watts
+                            self.drivebase._watts = watts  # noqa: SLF001
                     case b"motors.amps":
                         amps = [float(a.decode()) / 1000 for a in value.split(b",")]
-                        if len(amps) != 2:
+                        if len(amps) != 2:  # noqa: PLR2004
                             Logger().error(f"Received {len(amps)} amps, expected 2")
                         else:
-                            self.drivebase._amps = amps
+                            self.drivebase._amps = amps  # noqa: SLF001
                     case b"motors.status":
                         statuses = [MotorDriveStatus(int(s.decode())) for s in value.split(b",")]
-                        if len(statuses) != 2:
+                        if len(statuses) != 2:  # noqa: PLR2004
                             Logger().error(f"Received {len(statuses)} statuses, expected 2")
                         else:
-                            self.drivebase._states = statuses
+                            self.drivebase._states = statuses  # noqa: SLF001
                     case b"motors.powers":
                         powers = [float(p.decode()) / 100 for p in value.split(b",")]
-                        if len(powers) != 2:
+                        if len(powers) != 2:  # noqa: PLR2004
                             Logger().error(f"Received {len(powers)} powers, expected 2")
                         else:
-                            self.drivebase._powers = powers
+                            self.drivebase._powers = powers  # noqa: SLF001
             except (ValueError, UnicodeDecodeError) as e:
                 Logger().log(Level.ERROR, f"Failed to parse data from core: {e!r}", LoggerWriteOpts(exception=e))
 

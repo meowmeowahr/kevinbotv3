@@ -1,14 +1,12 @@
-from functools import partial
 import math
+from functools import partial
 
 import tomli
-from kevinbotlib.comm import StringSendable, FloatSendable
-
+from kevinbotlib.comm import FloatSendable, StringSendable
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import (
     RemoteXboxController,
     XboxControllerButtons,
-    LocalXboxController,
 )
 from kevinbotlib.logger import Level
 from kevinbotlib.metrics import Metric, MetricType
@@ -17,18 +15,18 @@ from kevinbotlib.scheduler import CommandScheduler, Trigger
 from kevinbotlib.vision import (
     CameraByIndex,
     EmptyPipeline,
-    VisionCommUtils,
     FrameEncoders,
     MjpegStreamSendable,
+    VisionCommUtils,
 )
 
 from kevinbotv3 import __about__
 from kevinbotv3.commands.drivebase_hold_command import DrivebaseHoldCommand
 from kevinbotv3.commands.lighting_commands import (
     FireCommand,
+    OffCommand,
     RainbowCommand,
     WhiteCommand,
-    OffCommand,
 )
 from kevinbotv3.core import KevinbotCore, LightingZone
 from kevinbotv3.runtime import Runtime
@@ -68,7 +66,14 @@ class Kevinbot(BaseRobot):
         )
         for batt in range(self.core.battery_count):
             self.metrics.add(f"kevinbot.battery.{batt}.voltage", Metric(f"Battery {batt} Voltage", 0.0))
-            BaseRobot.add_battery(self, 10, 21, partial(lambda batt: self.core.bms.voltages[batt] if len(self.core.bms.voltages) > batt - 1 else 0.0, batt))
+            BaseRobot.add_battery(
+                self,
+                10,
+                21,
+                partial(
+                    lambda batt: self.core.bms.voltages[batt] if len(self.core.bms.voltages) > batt - 1 else 0.0, batt
+                ),
+            )
 
         self.joystick = RemoteXboxController(self.comm_client, "%ControlConsole/joystick/0")
         # self.joystick = LocalXboxController(0)
@@ -163,7 +168,6 @@ class Kevinbot(BaseRobot):
                 self.comm_client.set("dashboard/LedState", StringSendable(value="#118fef"))
 
         self.scheduler.iterate()
-
 
     def robot_end(self) -> None:
         super().robot_end()
