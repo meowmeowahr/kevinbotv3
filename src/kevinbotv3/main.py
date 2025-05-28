@@ -5,8 +5,8 @@ import tomli
 from kevinbotlib.comm import FloatSendable, StringSendable
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import (
-    RemoteXboxController,
-    XboxControllerButtons,
+    RemoteNamedController,
+    NamedControllerButtons,
 )
 from kevinbotlib.logger import Level
 from kevinbotlib.metrics import Metric, MetricType
@@ -75,8 +75,8 @@ class Kevinbot(BaseRobot):
                 ),
             )
 
-        self.joystick = RemoteXboxController(self.comm_client, "%ControlConsole/joystick/0")
-        # self.joystick = LocalXboxController(0)
+        self.joystick = RemoteNamedController(self.comm_client, "%ControlConsole/joystick/0")
+        # self.joystick = LocalNamedController(0)
         self.joystick.start_polling()
 
         self.camera = CameraByIndex(0)
@@ -90,26 +90,26 @@ class Kevinbot(BaseRobot):
 
         self.telemetry.info(f"Welcome to Kevinbot v3 (Code version {__about__.__version__})")
 
-        Trigger(lambda: XboxControllerButtons.LeftBumper in self.joystick.get_buttons(), self.scheduler).on_true(
+        Trigger(lambda: NamedControllerButtons.LeftBumper in self.joystick.get_buttons(), self.scheduler).on_true(
             DrivebaseHoldCommand(self.core.drivebase, False)
         )
-        Trigger(lambda: XboxControllerButtons.RightBumper in self.joystick.get_buttons(), self.scheduler).on_true(
+        Trigger(lambda: NamedControllerButtons.RightBumper in self.joystick.get_buttons(), self.scheduler).on_true(
             DrivebaseHoldCommand(self.core.drivebase, True)
         )
 
-        Trigger(lambda: XboxControllerButtons.A in self.joystick.get_buttons(), self.scheduler).on_true(
+        Trigger(lambda: NamedControllerButtons.A in self.joystick.get_buttons(), self.scheduler).on_true(
             WhiteCommand(self.core.lighting, LightingZone.Base, 255)
         )
 
-        Trigger(lambda: XboxControllerButtons.B in self.joystick.get_buttons(), self.scheduler).on_true(
+        Trigger(lambda: NamedControllerButtons.B in self.joystick.get_buttons(), self.scheduler).on_true(
             FireCommand(self.core.lighting, LightingZone.Base, 255)
         )
 
-        Trigger(lambda: XboxControllerButtons.X in self.joystick.get_buttons(), self.scheduler).on_true(
+        Trigger(lambda: NamedControllerButtons.X in self.joystick.get_buttons(), self.scheduler).on_true(
             RainbowCommand(self.core.lighting, LightingZone.Base, 255)
         )
 
-        Trigger(lambda: XboxControllerButtons.Y in self.joystick.get_buttons(), self.scheduler).on_true(
+        Trigger(lambda: NamedControllerButtons.Y in self.joystick.get_buttons(), self.scheduler).on_true(
             OffCommand(self.core.lighting, LightingZone.Base)
         )
 
