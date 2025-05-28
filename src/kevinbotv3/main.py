@@ -36,7 +36,7 @@ from kevinbotv3.util import apply_deadband
 
 class Kevinbot(BaseRobot):
     def __init__(self):
-        super().__init__(["Teleoperated", "Sine"], log_level=Level.DEBUG)
+        super().__init__(["Teleoperated", "Sine"], log_level=Level.TRACE)
 
         # Read toml settings
         with open("deploy/options.toml", "rb") as f:
@@ -154,6 +154,12 @@ class Kevinbot(BaseRobot):
 
         self.comm_client.set("dashboard/DriveSpeedLeft", FloatSendable(value=self.core.drivebase.powers[0]))
         self.comm_client.set("dashboard/DriveSpeedRight", FloatSendable(value=self.core.drivebase.powers[1]))
+
+        self.comm_client.set("dashboard/DriveAmpLeft", FloatSendable(value=self.core.drivebase.amps[0]))
+        self.comm_client.set("dashboard/DriveAmpRight", FloatSendable(value=self.core.drivebase.amps[1]))
+
+        self.comm_client.set("dashboard/DriveWattLeft", FloatSendable(value=self.core.drivebase.watts[0]))
+        self.comm_client.set("dashboard/DriveWattRight", FloatSendable(value=self.core.drivebase.watts[1]))
 
         self.comm_client.set("dashboard/Battery", FloatSendable(value=self.core.bms.voltages[0]))
 

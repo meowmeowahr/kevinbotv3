@@ -220,7 +220,7 @@ class KevinbotCore:
                         else:
                             self.drivebase._watts = watts  # noqa: SLF001
                     case b"motors.amps":
-                        amps = [float(a.decode()) / 1000 for a in value.split(b",")]
+                        amps = [float(a.decode()) / 10000 for a in value.split(b",")]
                         if len(amps) != 2:  # noqa: PLR2004
                             Logger().error(f"Received {len(amps)} amps, expected 2")
                         else:
