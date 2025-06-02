@@ -1,11 +1,15 @@
+import datetime
+import locale
 import math
 from functools import partial
 
 import tomli
+
 from kevinbotlib.comm import FloatSendable, StringSendable
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import (
     RemoteNamedController,
+    LocalNamedController,
     NamedControllerButtons,
 )
 from kevinbotlib.logger import Level
@@ -19,6 +23,7 @@ from kevinbotlib.vision import (
     MjpegStreamSendable,
     VisionCommUtils,
 )
+from kevinbotlib.deployment import ManifestParser, Manifest
 
 from kevinbotv3 import __about__
 from kevinbotv3.commands.drivebase_hold_command import DrivebaseHoldCommand
@@ -46,6 +51,16 @@ class Kevinbot(BaseRobot):
         BaseRobot.add_basic_metrics(self, 2)
         VisionCommUtils.init_comms_types(self.comm_client)
         self.metrics.add("kevinbot.version", Metric("Kevinbot Code Version", __about__.__version__))
+
+        self.manifest = ManifestParser().manifest
+        if self.manifest:
+            self.metrics.add("kevinbot.deploy.tool-version", Metric("DeployTool Version", self.manifest.deploytool))
+            self.metrics.add("kevinbot.deploy.robotname", Metric("Robot Name", self.manifest.robot))
+            time = datetime.datetime.fromtimestamp(self.manifest.timestamp, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+            self.metrics.add("kevinbot.deploy.timestamp", Metric("Deploy Time", time))
+            self.metrics.add("kevinbot.deploy.git.branch", Metric("Git Branch", self.manifest.git["branch"]))
+            self.metrics.add("kevinbot.deploy.git.commit", Metric("Git Commit", self.manifest.git["commit"]))
+            self.metrics.add("kevinbot.deploy.git.tag", Metric("Git Tag", self.manifest.git["tag"]))
 
         self.scheduler = CommandScheduler()
 
@@ -75,8 +90,8 @@ class Kevinbot(BaseRobot):
                 ),
             )
 
-        self.joystick = RemoteNamedController(self.comm_client, "%ControlConsole/joystick/0")
-        # self.joystick = LocalNamedController(0)
+        # self.joystick = RemoteNamedController(self.comm_client, "%ControlConsole/joystick/0")
+        self.joystick = LocalNamedController(0)
         self.joystick.start_polling()
 
         self.camera = CameraByIndex(0)

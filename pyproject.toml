@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "kevinbotlib>=1.0.0a15",
-    "kevinbotlib-deploytool>=0.0.1a2",
+    "kevinbotlib-deploytool>=0.0.1a3",
     "pydantic>=2.10.6",
     "tomli>=2.2.1",
 ]
