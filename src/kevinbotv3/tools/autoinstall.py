@@ -2,7 +2,6 @@ import os
 import sys
 
 import pathenv
-
 from kevinbotlib.logger import Logger
 
 import kevinbotv3.tools.cli
@@ -23,7 +22,7 @@ def install():
             f.write(script)
         Logger().info("Created ~/tools/kevinbotv3")
 
-        os.chmod(os.path.expanduser("~/tools/kevinbotv3"), 0o755)
+        os.chmod(os.path.expanduser("~/tools/kevinbotv3"), 0o755)  # noqa: S103
         Logger().info("Set permissions on ~/tools/kevinbotv3 to 755")
 
     try:
@@ -32,4 +31,3 @@ def install():
             Logger().info("Added ~/tools to PATH")
     except NotImplementedError as e:
         Logger().warning(f"Failed to add ~/tools to PATH: {e!r}")
-
