@@ -25,10 +25,18 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
+    "halo>=0.0.31",
+    "huggingface-hub>=0.32.4",
     "kevinbotlib>=1.0.0a15",
     "kevinbotlib-deploytool>=0.0.1a3",
+    "pathenv>=1.5",
+    "platformdirs>=4.3.8",
+    "pyaudio>=0.2.14",
     "pydantic>=2.10.6",
+    "requests>=2.32.3",
+    "tabulate>=0.9.0",
     "tomli>=2.2.1",
+    "tqdm>=4.67.1",
 ]
 
 [project.urls]

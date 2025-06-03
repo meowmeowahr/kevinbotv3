@@ -2,6 +2,7 @@
   <dictionary name="project">
     <words>
       <w>drivebase</w>
+      <w>rhasspy</w>
     </words>
   </dictionary>
 </component>

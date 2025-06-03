@@ -1,16 +1,14 @@
 import datetime
-import locale
 import math
 from functools import partial
 
 import tomli
-
-from kevinbotlib.comm import FloatSendable, StringSendable, IntegerSendable
+from kevinbotlib.comm import FloatSendable, IntegerSendable, StringSendable
+from kevinbotlib.deployment import ManifestParser
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import (
-    RemoteNamedController,
-    LocalNamedController,
     NamedControllerButtons,
+    RemoteNamedController,
 )
 from kevinbotlib.logger import Level
 from kevinbotlib.metrics import Metric, MetricType
@@ -23,7 +21,6 @@ from kevinbotlib.vision import (
     MjpegStreamSendable,
     VisionCommUtils,
 )
-from kevinbotlib.deployment import ManifestParser, Manifest
 
 from kevinbotv3 import __about__
 from kevinbotv3.commands.drivebase_hold_command import DrivebaseHoldCommand
@@ -36,6 +33,7 @@ from kevinbotv3.commands.lighting_commands import (
 from kevinbotv3.core import KevinbotCore, LightingZone
 from kevinbotv3.runtime import Runtime
 from kevinbotv3.settings.schema import SettingsSchema
+from kevinbotv3.tools.autoinstall import install as autoinstall_tools
 from kevinbotv3.util import apply_deadband
 
 
@@ -56,7 +54,9 @@ class Kevinbot(BaseRobot):
         if self.manifest:
             self.metrics.add("kevinbot.deploy.tool-version", Metric("DeployTool Version", self.manifest.deploytool))
             self.metrics.add("kevinbot.deploy.robotname", Metric("Robot Name", self.manifest.robot))
-            time = datetime.datetime.fromtimestamp(self.manifest.timestamp, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+            time = datetime.datetime.fromtimestamp(self.manifest.timestamp, datetime.UTC).strftime(
+                "%Y-%m-%d %H:%M:%S %Z"
+            )
             self.metrics.add("kevinbot.deploy.timestamp", Metric("Deploy Time", time))
             self.metrics.add("kevinbot.deploy.git.branch", Metric("Git Branch", self.manifest.git["branch"]))
             self.metrics.add("kevinbot.deploy.git.commit", Metric("Git Commit", self.manifest.git["commit"]))
@@ -104,6 +104,8 @@ class Kevinbot(BaseRobot):
         super().robot_start()
 
         self.telemetry.info(f"Welcome to Kevinbot v3 (Code version {__about__.__version__})")
+
+        autoinstall_tools()
 
         Trigger(lambda: NamedControllerButtons.LeftBumper in self.joystick.get_buttons(), self.scheduler).on_true(
             DrivebaseHoldCommand(self.core.drivebase, False)

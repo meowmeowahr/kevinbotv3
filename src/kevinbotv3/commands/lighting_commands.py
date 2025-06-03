@@ -1,4 +1,4 @@
-from typing import Callable
+from collections.abc import Callable
 
 from kevinbotlib.logger import Logger
 from kevinbotlib.scheduler import Command
@@ -46,9 +46,7 @@ class WhiteCommand(Command):
         Runtime.Leds.effect = "white"
 
         self.lighting.set_effect(self.zone, LightingEffect.color1)
-        self.lighting.set_color1(
-            self.zone, (255 * int(self.brightness() / 255), 255 * int(self.brightness() / 255), 255 * int(self.brightness() / 255))
-        )
+        self.lighting.set_color1(self.zone, (self.brightness(),) * 3)
 
     def execute(self) -> None:
         return super().execute()
