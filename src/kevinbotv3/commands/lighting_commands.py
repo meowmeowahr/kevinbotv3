@@ -1,3 +1,5 @@
+from typing import Callable
+
 from kevinbotlib.logger import Logger
 from kevinbotlib.scheduler import Command
 
@@ -31,7 +33,7 @@ class OffCommand(Command):
 
 
 class WhiteCommand(Command):
-    def __init__(self, lighting: KevinbotLighting, zone: LightingZone, brightness: int = 255) -> None:
+    def __init__(self, lighting: KevinbotLighting, zone: LightingZone, brightness: Callable[[], int]) -> None:
         super().__init__()
 
         self.lighting = lighting
@@ -45,7 +47,7 @@ class WhiteCommand(Command):
 
         self.lighting.set_effect(self.zone, LightingEffect.color1)
         self.lighting.set_color1(
-            self.zone, (255 * (self.brightness // 255), 255 * (self.brightness // 255), 255 * (self.brightness // 255))
+            self.zone, (255 * int(self.brightness() / 255), 255 * int(self.brightness() / 255), 255 * int(self.brightness() / 255))
         )
 
     def execute(self) -> None:
@@ -59,7 +61,7 @@ class WhiteCommand(Command):
 
 
 class FireCommand(Command):
-    def __init__(self, lighting: KevinbotLighting, zone: LightingZone, brightness: int = 255) -> None:
+    def __init__(self, lighting: KevinbotLighting, zone: LightingZone, brightness: Callable[[], int]) -> None:
         super().__init__()
 
         self.lighting = lighting
@@ -72,7 +74,7 @@ class FireCommand(Command):
         Runtime.Leds.effect = "fire"
 
         self.lighting.set_effect(self.zone, LightingEffect.fire)
-        self.lighting.set_brightness(self.zone, self.brightness)
+        self.lighting.set_brightness(self.zone, self.brightness())
 
     def execute(self) -> None:
         return super().execute()
@@ -85,7 +87,7 @@ class FireCommand(Command):
 
 
 class RainbowCommand(Command):
-    def __init__(self, lighting: KevinbotLighting, zone: LightingZone, brightness: int = 255) -> None:
+    def __init__(self, lighting: KevinbotLighting, zone: LightingZone, brightness: Callable[[], int]) -> None:
         super().__init__()
 
         self.lighting = lighting
@@ -98,7 +100,7 @@ class RainbowCommand(Command):
         Runtime.Leds.effect = "rainbow"
 
         self.lighting.set_effect(self.zone, LightingEffect.rainbow)
-        self.lighting.set_brightness(self.zone, self.brightness)
+        self.lighting.set_brightness(self.zone, self.brightness())
 
     def execute(self) -> None:
         return super().execute()

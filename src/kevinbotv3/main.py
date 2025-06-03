@@ -5,7 +5,7 @@ from functools import partial
 
 import tomli
 
-from kevinbotlib.comm import FloatSendable, StringSendable
+from kevinbotlib.comm import FloatSendable, StringSendable, IntegerSendable
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import (
     RemoteNamedController,
@@ -90,8 +90,8 @@ class Kevinbot(BaseRobot):
                 ),
             )
 
-        # self.joystick = RemoteNamedController(self.comm_client, "%ControlConsole/joystick/0")
-        self.joystick = LocalNamedController(0)
+        self.joystick = RemoteNamedController(self.comm_client, "%ControlConsole/joystick/0")
+        # self.joystick = LocalNamedController(0)
         self.joystick.start_polling()
 
         self.camera = CameraByIndex(0)
@@ -113,15 +113,15 @@ class Kevinbot(BaseRobot):
         )
 
         Trigger(lambda: NamedControllerButtons.A in self.joystick.get_buttons(), self.scheduler).on_true(
-            WhiteCommand(self.core.lighting, LightingZone.Base, 255)
+            WhiteCommand(self.core.lighting, LightingZone.Base, lambda: Runtime.Leds.brightness)
         )
 
         Trigger(lambda: NamedControllerButtons.B in self.joystick.get_buttons(), self.scheduler).on_true(
-            FireCommand(self.core.lighting, LightingZone.Base, 255)
+            FireCommand(self.core.lighting, LightingZone.Base, lambda: Runtime.Leds.brightness)
         )
 
         Trigger(lambda: NamedControllerButtons.X in self.joystick.get_buttons(), self.scheduler).on_true(
-            RainbowCommand(self.core.lighting, LightingZone.Base, 255)
+            RainbowCommand(self.core.lighting, LightingZone.Base, lambda: Runtime.Leds.brightness)
         )
 
         Trigger(lambda: NamedControllerButtons.Y in self.joystick.get_buttons(), self.scheduler).on_true(
@@ -129,6 +129,8 @@ class Kevinbot(BaseRobot):
         )
 
         self.core.begin()
+
+        self.comm_client.set("dashboard/LedBrightness", IntegerSendable(value=Runtime.Leds.brightness))
 
     def robot_periodic(self, opmode: str, enabled: bool):  # noqa: FBT001
         super().robot_periodic(opmode, enabled)
@@ -187,6 +189,10 @@ class Kevinbot(BaseRobot):
                 self.comm_client.set("dashboard/LedState", StringSendable(value="#ef8f11"))
             case "rainbow":
                 self.comm_client.set("dashboard/LedState", StringSendable(value="#118fef"))
+
+        brightness = self.comm_client.get("dashboard/LedBrightness", IntegerSendable)
+        if brightness:
+            Runtime.Leds.brightness = brightness.value
 
         self.scheduler.iterate()
 

@@ -4,5 +4,5 @@ python_version = "3.13"
 glibc_version = "2.40"
 arch = "aarch64"
 user = "kevinbot"
-host = "10.0.0.2"
+host = "robot.local"
 port = 22
