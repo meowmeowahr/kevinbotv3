@@ -163,8 +163,8 @@ class KevinbotCore:
         self._controller.write(b"\x04\x01", b"0")
         self._controller.write(b"\x03\x05")
         self._status.linked = True
-        Thread(target=self.heartbeat_loop, daemon=True).start()
-        Thread(target=self._rx_loop, daemon=True).start()
+        Thread(target=self.heartbeat_loop, daemon=True, name="KevinbotV3.Core.Heartbeat").start()
+        Thread(target=self._rx_loop, daemon=True, name="KevinbotV3.Core.Rx").start()
 
     def unlink(self):
         self._controller.write(b"\x02\x03")

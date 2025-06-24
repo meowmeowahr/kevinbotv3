@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import threading
 from abc import ABC, abstractmethod
 from multiprocessing import Process as _Process
 from os import PathLike
@@ -70,8 +71,8 @@ class BaseTTSEngine(ABC):
 
 class PiperTTSEngine(BaseTTSEngine):
     """
-    Text to Speech Engine using rhasspy/Piper.
-    You will need to provide your own executable for this to work.
+    Text to Speech Engine using rhasspy/Piper, running in the background.
+    Sends text to stdin and plays audio from stdout using PyAudio.
     """
 
     def __init__(self, model: str, executable: PathLike | str) -> None:
@@ -82,10 +83,77 @@ class PiperTTSEngine(BaseTTSEngine):
             model: Pre-downloaded Piper model
         """
         super().__init__()
-
-        self.executable = executable
-        self._model: str = model
+        self.executable = str(executable)
+        self._model = model
         self._debug = False
+        self._piper_process: subprocess.Popen | None = None
+        self._stream = None
+        self._pyaudio = None
+        self._bitrate = None
+        self._start_piper()
+
+    def _start_piper(self):
+        """Start the Piper process in the background and set up PyAudio stream."""
+        modelfile = get_piper_models()[self._model]
+
+        # Attempt to retrieve the bitrate
+        try:
+            with open(modelfile + ".json") as config:
+                self._bitrate = int(json.loads(config.read())["audio"]["sample_rate"])
+        except (KeyError, json.JSONDecodeError, FileNotFoundError):
+            self._bitrate = 22050
+            logger.warning("Bitrate config data parsing failure. Assuming bitrate for `medium` quality (22050)")
+
+        # Set up Piper synthesis command
+        piper_command = [
+            self.executable,
+            "--model",
+            modelfile,
+            "--config",
+            modelfile + ".json",
+            "--output-raw",
+        ]
+
+        # Start Piper process
+        self._piper_process = subprocess.Popen(
+            piper_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=0,  # Unbuffered for real-time processing
+        )
+
+        # Initialize PyAudio and stream
+        audio = ShutupPyAudio().start()
+        self._stream = audio.open(format=paInt16, channels=1, rate=self._bitrate, output=True)
+
+        def player():
+            # Read and play audio in chunks
+            while True:
+                data = self._piper_process.stdout.read(1024)
+                if not data:
+                    continue
+                self._stream.write(data)
+
+        threading.Thread(target=player, daemon=True).start()
+
+    def __del__(self):
+        """Clean up resources when the object is destroyed."""
+        self._cleanup()
+
+    def _cleanup(self):
+        """Close the Piper process and PyAudio stream."""
+        if self._stream:
+            self._stream.stop_stream()
+            self._stream.close()
+        if self._pyaudio:
+            self._pyaudio.terminate()
+        if self._piper_process:
+            self._piper_process.terminate()
+            try:
+                self._piper_process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                self._piper_process.kill()
 
     @property
     def model(self):
@@ -98,12 +166,14 @@ class PiperTTSEngine(BaseTTSEngine):
 
     @model.setter
     def model(self, value: str):
-        """Setter for the currently loaded model.
+        """Setter for the currently loaded model. Restarts Piper with the new model.
 
         Args:
             value (str): model name
         """
         self._model = value
+        self._cleanup()
+        self._start_piper()
 
     @property
     def models(self) -> list[str]:
@@ -112,60 +182,21 @@ class PiperTTSEngine(BaseTTSEngine):
         Returns:
             list[str]: List of model names
         """
-
         return list(get_piper_models().keys())
 
     def speak(self, text: str):
-        """Synthesize the given text using the set piper executable. Play it in real-time over the system's speakers.
+        """Synthesize the given text using the running Piper process and play it in real-time.
 
         Args:
             text (str): Text to synthesize
         """
+        if not self._piper_process or self._piper_process.poll() is not None:
+            logger.warning("Piper process not running. Restarting...")
+            self._cleanup()
+            self._start_piper()
 
-        modelfile = get_piper_models()[self._model]
-
-        # Attempt to retrieve the bitrate
-        try:
-            with open(modelfile + ".json") as config:
-                bitrate = int(json.loads(config.read())["audio"]["sample_rate"])
-        except (KeyError, json.JSONDecodeError, FileNotFoundError):
-            bitrate = 22050
-            logger.warning("Bitrate config data parsing failure. Assuming bitrate for `medium` quality (22050)")
-
-        with ShutupPyAudio() as audio:
-            stream = audio.open(format=paInt16, channels=1, rate=bitrate, output=True)
-
-            # Set up Piper synthesis command
-            piper_command = [
-                self.executable,
-                "--model",
-                modelfile,
-                "--config",
-                modelfile + ".json",
-                "--output-raw",
-            ]
-
-            # Use subprocess to pipe synthesis to playback
-            with subprocess.Popen(
-                piper_command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            ) as piper_process:
-                if piper_process.stdin and piper_process.stdout:
-                    piper_process.stdin.write(text.encode("utf-8"))
-                    piper_process.stdin.close()
-
-                    while True:
-                        data = piper_process.stdout.read(1024)
-                        if not data:
-                            break
-                        stream.write(data)
-
-                piper_process.wait()
-
-            stream.stop_stream()
-            stream.close()
+        if self._piper_process.stdin and self._piper_process.stdout:
+            self._piper_process.stdin.write((text + "\n").encode("utf-8"))
 
 
 class ManagedSpeaker:
@@ -192,3 +223,6 @@ class ManagedSpeaker:
         """Attempt to cancel the current speech."""
         if self.process and self.process.is_alive():
             self.process.terminate()
+
+    def running(self) -> bool:
+        return self.process.is_alive() if self.process else False

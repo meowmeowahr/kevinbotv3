@@ -13,9 +13,15 @@ class ControllerSettings(BaseModel):
     steer_deadband: float
 
 
+class TTSSettings(BaseModel):
+    model: str
+    executable: str
+
+
 class KevinbotSettings(BaseModel):
     core: CoreSettings
     controller: ControllerSettings
+    tts: TTSSettings
 
 
 class SettingsSchema(BaseModel):

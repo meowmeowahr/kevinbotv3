@@ -1,9 +1,21 @@
 import datetime
 import math
+import threading
 from functools import partial
 
 import tomli
-from kevinbotlib.comm import FloatSendable, IntegerSendable, StringSendable
+from kevinbotlib.comm.pipeline import PipelinedCommSetter
+from kevinbotlib.comm.request import SetRequest
+from kevinbotlib.comm.sendables import (
+    FloatSendable,
+    IntegerSendable,
+    StringSendable,
+    Coord2dSendable,
+    Coord2dListSendable,
+    Coord3dSendable,
+    Pose2dSendable,
+)
+from kevinbotlib.coord import Coord2d, Coord3d, Pose2d, Angle2d
 from kevinbotlib.deployment import ManifestParser
 from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import (
@@ -21,6 +33,7 @@ from kevinbotlib.vision import (
     MjpegStreamSendable,
     VisionCommUtils,
 )
+from line_profiler import profile
 
 from kevinbotv3 import __about__
 from kevinbotv3.commands.drivebase_hold_command import DrivebaseHoldCommand
@@ -28,9 +41,15 @@ from kevinbotv3.commands.lighting_commands import (
     FireCommand,
     OffCommand,
     RainbowCommand,
+    SpeechLightingCommand,
     WhiteCommand,
 )
+from kevinbotv3.commands.speech_command import SpeechCommand
 from kevinbotv3.core import KevinbotCore, LightingZone
+from kevinbotv3.piper import (
+    ManagedSpeaker,
+    PiperTTSEngine,
+)
 from kevinbotv3.runtime import Runtime
 from kevinbotv3.settings.schema import SettingsSchema
 from kevinbotv3.tools.autoinstall import install as autoinstall_tools
@@ -39,7 +58,7 @@ from kevinbotv3.util import apply_deadband
 
 class Kevinbot(BaseRobot):
     def __init__(self):
-        super().__init__(["Teleoperated", "Sine"], log_level=Level.TRACE)
+        super().__init__(["Teleoperated", "Sine"], log_level=Level.TRACE, enable_stderr_logger=True, cycle_time=20)
 
         # Read toml settings
         with open("deploy/options.toml", "rb") as f:
@@ -66,6 +85,7 @@ class Kevinbot(BaseRobot):
 
         self.core = KevinbotCore(
             RawSerialInterface(
+                self,
                 self.settings.kevinbot.core.port,
                 self.settings.kevinbot.core.baud,
                 timeout=self.settings.kevinbot.core.timeout,
@@ -94,9 +114,15 @@ class Kevinbot(BaseRobot):
         # self.joystick = LocalNamedController(0)
         self.joystick.start_polling()
 
-        self.camera = CameraByIndex(0)
+        self.camera = CameraByIndex(self, 0)
         self.camera.set_resolution(1280, 720)
         self.pipeline = EmptyPipeline(self.camera.get_frame)
+        self.pipeline_thread = threading.Thread(target=self.vision_loop, daemon=True, name="KevinbotV3.VisionLoop")
+
+        self.tts_engine = PiperTTSEngine(self.settings.kevinbot.tts.model, self.settings.kevinbot.tts.executable)
+        self.tts = ManagedSpeaker(self.tts_engine)
+
+        self.pipelined_setter = PipelinedCommSetter(self.comm_client)
 
         self.sine_period = 0
 
@@ -105,7 +131,8 @@ class Kevinbot(BaseRobot):
 
         self.telemetry.info(f"Welcome to Kevinbot v3 (Code version {__about__.__version__})")
 
-        autoinstall_tools()
+        if not BaseRobot.IS_SIM:
+            autoinstall_tools()
 
         Trigger(lambda: NamedControllerButtons.LeftBumper in self.joystick.get_buttons(), self.scheduler).on_true(
             DrivebaseHoldCommand(self.core.drivebase, False)
@@ -130,10 +157,31 @@ class Kevinbot(BaseRobot):
             OffCommand(self.core.lighting, LightingZone.Base)
         )
 
+        Trigger(lambda: NamedControllerButtons.Back in self.joystick.get_buttons(), self.scheduler).on_true(
+            SpeechCommand(self.tts_engine, "This is a test of local on-board Kevinbot AI speech synthesis.")
+        )
+
+        Trigger(lambda: self.tts.running(), self.scheduler).while_true(
+            SpeechLightingCommand(self.core.lighting, LightingZone.Base, lambda: Runtime.Leds.brightness)
+        )
+
         self.core.begin()
+
+        self.pipeline_thread.start()
 
         self.comm_client.set("dashboard/LedBrightness", IntegerSendable(value=Runtime.Leds.brightness))
 
+    def vision_loop(self):
+        while True:
+            ok, frame = self.pipeline.run()
+            if ok:
+                encoded = FrameEncoders.encode_jpg(frame, 50)
+                self.comm_client.set(
+                    "streams/camera0",
+                    MjpegStreamSendable(value=encoded, quality=50, resolution=frame.shape[:2]),
+                )
+
+    @profile
     def robot_periodic(self, opmode: str, enabled: bool):  # noqa: FBT001
         super().robot_periodic(opmode, enabled)
 
@@ -153,14 +201,6 @@ class Kevinbot(BaseRobot):
             #     -apply_deadband(self.joystick.get_triggers()[0]-self.joystick.get_triggers()[1], self.settings.kevinbot.controller.power_deadband),
             #     -apply_deadband(self.joystick.get_left_stick()[0], self.settings.kevinbot.controller.steer_deadband),
             # )
-
-            ok, frame = self.pipeline.run()
-            if ok:
-                encoded = FrameEncoders.encode_jpg(frame, 75)
-                self.comm_client.set(
-                    "streams/camera0",
-                    MjpegStreamSendable(value=encoded, quality=50, resolution=frame.shape[:2]),
-                )
         elif opmode == "Sine":
             self.sine_period += 0.001
             self.core.drivebase.drive_at_power(
@@ -168,34 +208,86 @@ class Kevinbot(BaseRobot):
                 math.sin(self.sine_period),
             )
 
-        self.comm_client.set("dashboard/DriveStateLeft", StringSendable(value=self.core.drivebase.states[0].name))
-        self.comm_client.set("dashboard/DriveStateRight", StringSendable(value=self.core.drivebase.states[1].name))
-
-        self.comm_client.set("dashboard/DriveSpeedLeft", FloatSendable(value=self.core.drivebase.powers[0]))
-        self.comm_client.set("dashboard/DriveSpeedRight", FloatSendable(value=self.core.drivebase.powers[1]))
-
-        self.comm_client.set("dashboard/DriveAmpLeft", FloatSendable(value=self.core.drivebase.amps[0]))
-        self.comm_client.set("dashboard/DriveAmpRight", FloatSendable(value=self.core.drivebase.amps[1]))
-
-        self.comm_client.set("dashboard/DriveWattLeft", FloatSendable(value=self.core.drivebase.watts[0]))
-        self.comm_client.set("dashboard/DriveWattRight", FloatSendable(value=self.core.drivebase.watts[1]))
-
-        self.comm_client.set("dashboard/Battery", FloatSendable(value=self.core.bms.voltages[0]))
+        self.pipelined_setter.extend([
+            SetRequest(
+                "dashboard/DriveStateLeft",
+                StringSendable(value=self.core.drivebase.states[0].name),
+            ),
+            SetRequest(
+                "dashboard/DriveStateRight",
+                StringSendable(value=self.core.drivebase.states[1].name),
+            ),
+            SetRequest(
+                "dashboard/DriveSpeedLeft",
+                FloatSendable(value=self.core.drivebase.powers[0]),
+            ),
+            SetRequest(
+                "dashboard/DriveSpeedRight",
+                FloatSendable(value=self.core.drivebase.powers[1]),
+            ),
+            SetRequest(
+                "dashboard/DriveAmpLeft",
+                FloatSendable(value=self.core.drivebase.amps[0]),
+            ),
+            SetRequest(
+                "dashboard/DriveAmpRight",
+                FloatSendable(value=self.core.drivebase.amps[1]),
+            ),
+            SetRequest(
+                "dashboard/DriveWattLeft",
+                FloatSendable(value=self.core.drivebase.watts[0]),
+            ),
+            SetRequest(
+                "dashboard/DriveWattRight",
+                FloatSendable(value=self.core.drivebase.watts[1]),
+            ),
+            SetRequest(
+                "dashboard/Battery",
+                FloatSendable(value=self.core.bms.voltages[0]),
+            ),
+            SetRequest(
+                "dashboard/Pose/Coord2d",
+                Coord2dSendable(value=Coord2d(1, 1))
+            ),
+            SetRequest(
+                "dashboard/Pose/Coord3d",
+                Coord3dSendable(value=Coord3d(1, 1, 1))
+            ),
+            SetRequest(
+                "dashboard/Pose/Pose2d",
+                Pose2dSendable(value=Pose2d(Coord2d(1, 1), Angle2d(1)))
+            ),
+            SetRequest(
+                "dashboard/Pose/Coord2dList",
+                Coord2dListSendable(
+                    value=[
+                        Coord2d(
+                            1 + math.sin(self.sine_period * 10 + i * math.pi / 4),
+                            1 + math.sin(self.sine_period * 10  + i * math.pi / 2)
+                        )
+                        for i in range(6)
+                    ]
+                )
+            ),
+        ]
+        )
+        # self.comm_client.set("dashboard/Cpu", FloatSendable(value=SystemPerformanceData.cpu().total_usage_percent))
 
         match Runtime.Leds.effect:
             case "white":
-                self.comm_client.set("dashboard/LedState", StringSendable(value="#ffffff"))
+                self.pipelined_setter.add(SetRequest("dashboard/LedState", StringSendable(value="#ffffff")))
             case "off":
-                self.comm_client.set("dashboard/LedState", StringSendable(value="#000000"))
+                self.pipelined_setter.add(SetRequest("dashboard/LedState", StringSendable(value="#000000")))
             case "fire":
-                self.comm_client.set("dashboard/LedState", StringSendable(value="#ef8f11"))
+                self.pipelined_setter.add(SetRequest("dashboard/LedState", StringSendable(value="#ef8f11")))
             case "rainbow":
-                self.comm_client.set("dashboard/LedState", StringSendable(value="#118fef"))
+                self.pipelined_setter.add(SetRequest("dashboard/LedState", StringSendable(value="#118fef")))
 
         brightness = self.comm_client.get("dashboard/LedBrightness", IntegerSendable)
         if brightness:
             Runtime.Leds.brightness = brightness.value
 
+        self.pipelined_setter.send()
         self.scheduler.iterate()
 
     def robot_end(self) -> None:
