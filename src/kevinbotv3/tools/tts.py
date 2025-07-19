@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sys
+import time
 
 import click
 import requests
@@ -149,7 +150,7 @@ def fetch(repo: str = "rhasspy/piper-voices"):
 @click.option("--stdin", is_flag=True, help="Enable text input from stdin")
 def synthesize(executable: str, text: str | None, model: str, *, verbose: bool, stdin: bool):
     """Synthesize text into speech using Piper"""
-    Logger().configure(LoggerConfiguration())
+    Logger().configure(LoggerConfiguration(enable_stderr_logger=True))
 
     engine = PiperTTSEngine(model, executable)
     engine.debug = verbose
@@ -163,6 +164,9 @@ def synthesize(executable: str, text: str | None, model: str, *, verbose: bool, 
         return
 
     engine.speak(text)
+    while engine.playing:
+        time.sleep(0.1)
+    Logger().info("Speech synthesis complete")
 
 
 piper.add_command(models)

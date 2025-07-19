@@ -9,5 +9,6 @@ power_deadband=0.06
 steer_deadband=0.00
 
 [kevinbot.tts]
-executable="/home/kevin/Downloads/piper_amd64/piper/piper"
+executable="/home/kevinbot/piper/piper"
+#executable="/home/kevin/Downloads/piper_amd64/piper/piper"
 model="en_US-ryan-high"

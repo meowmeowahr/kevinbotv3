@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sys
 import threading
 from abc import ABC, abstractmethod
 from multiprocessing import Process as _Process
@@ -9,9 +10,9 @@ from pathlib import Path
 
 import platformdirs
 from loguru import logger
-from pyaudio import paInt16
+from pyaudio import paInt16, PyAudio
 
-from kevinbotv3.audioutils import ShutupPyAudio
+from kevinbotv3.audioutils import ShutupPyAudioCtxMgr
 
 
 def _abslistdir(directory):
@@ -90,6 +91,7 @@ class PiperTTSEngine(BaseTTSEngine):
         self._stream = None
         self._pyaudio = None
         self._bitrate = None
+        self._playing = False
         self._start_piper()
 
     def _start_piper(self):
@@ -119,12 +121,12 @@ class PiperTTSEngine(BaseTTSEngine):
             piper_command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             bufsize=0,  # Unbuffered for real-time processing
         )
 
         # Initialize PyAudio and stream
-        audio = ShutupPyAudio().start()
+        audio = PyAudio()
         self._stream = audio.open(format=paInt16, channels=1, rate=self._bitrate, output=True)
 
         def player():
@@ -134,8 +136,13 @@ class PiperTTSEngine(BaseTTSEngine):
                 if not data:
                     continue
                 self._stream.write(data)
+                self._playing = False in [b == 0 for b in data]
 
         threading.Thread(target=player, daemon=True).start()
+
+    @property
+    def playing(self) -> bool:
+        return self._playing
 
     def __del__(self):
         """Clean up resources when the object is destroyed."""
@@ -197,6 +204,7 @@ class PiperTTSEngine(BaseTTSEngine):
 
         if self._piper_process.stdin and self._piper_process.stdout:
             self._piper_process.stdin.write((text + "\n").encode("utf-8"))
+            self._playing = True
 
 
 class ManagedSpeaker:

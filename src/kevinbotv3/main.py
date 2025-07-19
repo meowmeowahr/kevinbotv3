@@ -21,6 +21,7 @@ from kevinbotlib.hardware.interfaces.serial import RawSerialInterface
 from kevinbotlib.joystick import (
     NamedControllerButtons,
     RemoteNamedController,
+    LocalNamedController,
 )
 from kevinbotlib.logger import Level
 from kevinbotlib.metrics import Metric, MetricType
@@ -176,9 +177,13 @@ class Kevinbot(BaseRobot):
             ok, frame = self.pipeline.run()
             if ok:
                 encoded = FrameEncoders.encode_jpg(frame, 50)
-                self.comm_client.set(
-                    "streams/camera0",
-                    MjpegStreamSendable(value=encoded, quality=50, resolution=frame.shape[:2]),
+                self.comm_client.multi_set(
+                    [
+                        SetRequest(
+                            "streams/camera0",
+                            MjpegStreamSendable(value=encoded, quality=50, resolution=frame.shape[:2]),
+                        ),
+                    ]
                 )
 
     @profile
