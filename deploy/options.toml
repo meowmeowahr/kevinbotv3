@@ -1,12 +1,32 @@
 [kevinbot.core]
-port="/dev/ttyUSB0"
+port="/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A10LINCF-if00-port0"
 baud=921600
 timeout=2
 tick=1.0
 
+[kevinbot.drive]
+led_brightness=10 # out of 255
+max_volts=19.5
+modulation=2 # 0=Sine
+max_vel=35
+kp=0.5
+ki=8.5
+kd=0.0
+kr=1000.0
+
+[kevinbot.drive.left]
+port="/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A10LIFUC-if00-port0"
+baud=921600
+
+[kevinbot.drive.right]
+port="/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A50285BI-if00-port0"
+baud=460800
+
 [kevinbot.controller]
-power_deadband=0.06
-steer_deadband=0.00
+power_deadband=0.1
+steer_deadband=0.08
+accel_p = 0.5
+coast_p = 0.3
 
 [kevinbot.tts]
 executable="/home/kevinbot/piper/piper"

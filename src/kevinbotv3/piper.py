@@ -152,7 +152,7 @@ class PiperTTSEngine(BaseTTSEngine):
         """Close the Piper process and PyAudio stream."""
         if self._stream:
             self._stream.stop_stream()
-            self._stream.close()
+            self._stream.stop()
         if self._pyaudio:
             self._pyaudio.terminate()
         if self._piper_process:

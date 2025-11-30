@@ -11,6 +11,25 @@ class CoreSettings(BaseModel):
 class ControllerSettings(BaseModel):
     power_deadband: float
     steer_deadband: float
+    accel_p: float
+    coast_p: float
+
+
+class DriveMotorSettings(BaseModel):
+    port: str
+    baud: int
+
+class DriveSettings(BaseModel):
+    max_volts: float
+    max_vel: float
+    led_brightness: int
+    kp: float
+    ki: float
+    kd: float
+    kr: float
+    modulation: int
+    left: DriveMotorSettings
+    right: DriveMotorSettings
 
 
 class TTSSettings(BaseModel):
@@ -20,6 +39,7 @@ class TTSSettings(BaseModel):
 
 class KevinbotSettings(BaseModel):
     core: CoreSettings
+    drive: DriveSettings
     controller: ControllerSettings
     tts: TTSSettings
 

@@ -145,7 +145,7 @@ class KevinbotBms(BaseModel):
 
 
 class KevinbotCore:
-    def __init__(self, interface: RawSerialInterface, heartbeat_interval: float = 1, battery_count: int = 2) -> None:
+    def __init__(self, interface: RawSerialInterface, heartbeat_interval: float = 1, battery_count: int = 1) -> None:
         self._controller = RawKeyValueSerialController(interface, b"\xfa", b"\xfe")
         BaseRobot.register_estop_hook(lambda: self.estop())
         self.heartbeat_interval = heartbeat_interval
@@ -194,10 +194,10 @@ class KevinbotCore:
                     return
 
                 data = self._controller.read()
-
                 if not data:
                     continue
                 key, value = data
+
                 match key:
                     case b"core.enabled":
                         self._status.enabled = value == b"true"
@@ -209,10 +209,7 @@ class KevinbotCore:
                         self._controller.write(b"\x03\x05")
                     case b"bms.voltages":
                         voltages = [float(v.decode()) / 100 for v in value.split(b",")]
-                        if len(voltages) != self.battery_count:
-                            Logger().error(f"Received {len(voltages)} voltages, expected {self.battery_count}")
-                        else:
-                            self._bms.voltages = voltages
+                        self._bms.voltages = voltages[:self.battery_count]
                     case b"motors.watts":
                         watts = [float(w.decode()) / 1000 for w in value.split(b",")]
                         if len(watts) != 2:  # noqa: PLR2004

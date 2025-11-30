@@ -25,8 +25,7 @@ classifiers = [
 dependencies = [
     "halo>=0.0.31",
     "huggingface-hub>=0.32.4",
-    "kevinbotlib>=1.0.0a15",
-    "kevinbotlib-deploytool>=0.0.1a3",
+    "kevinbotlib>=1.0.0a18",
     "pathenv>=1.5",
     "platformdirs>=4.3.8",
     "pyaudio>=0.2.14",
@@ -35,6 +34,11 @@ dependencies = [
     "tabulate>=0.9.0",
     "tomli>=2.2.1",
     "tqdm>=4.67.1",
+    "modbus-crc~=1.3",
+    "cbor2~=5.7.1",
+    "semver~=3.0.4",
+    "superqt~=0.7.6",
+    "fonticon-materialdesignicons7~=7.2.96",
     "line_profiler", # TODO: REMOVE ME LATER
 ]
 
